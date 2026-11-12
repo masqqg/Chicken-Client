@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag to attach the jar to
         required: true
-        default: v1.0.0
+        default: v1.0.2
   push:
     tags:
       - "v*"
@@ -37,8 +37,10 @@ jobs:
           ./gradlew build --no-daemon --stacktrace
 
       - name: Attach the jar to the release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          files: build/libs/chicken-client-*.jar
-          fail_on_unmatched_files: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then tag="${GITHUB_REF_NAME}"; fi
+          gh release upload "$tag" build/libs/chicken-client-*.jar --clobber
+          gh release view "$tag" --json name,assets
