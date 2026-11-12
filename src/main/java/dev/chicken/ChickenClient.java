@@ -37,7 +37,10 @@ import java.nio.file.Path;
 public class ChickenClient implements ClientModInitializer {
     public static final String MOD_ID = "chicken-client";
     public static final String NAME = "Chicken Client";
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = FabricLoader.getInstance()
+        .getModContainer(MOD_ID)
+        .map(container -> container.getMetadata().getVersion().getFriendlyString())
+        .orElse("dev");
     public static final Logger LOG = LoggerFactory.getLogger(NAME);
 
     public static final Path FOLDER = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID);

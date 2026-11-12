@@ -11,6 +11,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 
 /**
  * The client's vector renderer: NanoVG over OpenGL.
@@ -93,7 +94,16 @@ public final class Renderer2D {
         if (failed) return false;
 
         try {
-            ctx = NanoVGGL3.nvgCreate(NanoVGGL3.NVG_ANTIALIAS | NanoVGGL3.NVG_STENCIL_STROKES);
+            if (Files.exists(ChickenClient.FOLDER.resolve("disable-hud"))) {
+                failed = true;
+                ChickenClient.LOG.warn("HUD disabled by config/chicken-client/disable-hud");
+                return false;
+            }
+
+            // Antialiasing only: NVG_STENCIL_STROKES takes exotic stencil paths that some
+            // mobile GL translators (ANGLE/MobileGlues) do not handle reliably.
+            ctx = NanoVGGL3.nvgCreate(NanoVGGL3.NVG_ANTIALIAS);
+            if (ctx == 0L) ctx = NanoVGGL3.nvgCreate(0);
 
             if (ctx == 0L) {
                 failed = true;
@@ -105,10 +115,11 @@ public final class Renderer2D {
                 fontHandles[font.ordinal()] = loadFont(font);
             }
 
+            ChickenClient.LOG.info("NanoVG HUD ready ({} fonts loaded)", fontHandles.length);
             return true;
         } catch (Throwable t) {
             failed = true;
-            ChickenClient.LOG.error("NanoVG initialisation failed", t);
+            ChickenClient.LOG.error("NanoVG initialisation failed; the client GUI will be disabled", t);
             return false;
         }
     }
