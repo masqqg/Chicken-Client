@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "dev.chicken.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ClientPacketListenerMixin",
+    "ConnectionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

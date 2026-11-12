@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "chicken-client",
+  "version": "${version}",
+  "name": "Chicken Client",
+  "description": "Standalone Chicken Client - a modern, NanoVG rendered utility client.",
+  "authors": [
+    "Rush2pzm"
+  ],
+  "contact": {
+    "sources": "https://github.com/masqqg/Chicken-Client"
+  },
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.chicken.ChickenClient"
+    ]
+  },
+  "mixins": [
+    "chicken-client.mixins.json"
+  ],
+  "depends": {
+    "java": ">=${jdk_version}",
+    "minecraft": "${minecraft_version}",
+    "fabricloader": ">=0.19.5",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "geckolib": ">=5.4.5"
+  }
+}
