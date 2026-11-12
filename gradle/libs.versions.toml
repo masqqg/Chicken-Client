@@ -12,14 +12,14 @@ loom = "1.15.4"
 
 # Libraries
 geckolib = "5.4.5"
-anovg = "3.3.3"
+nanovg = "3.3.3"
 
 [libraries]
 minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
 geckolib = { module = "maven.modrinth:geckolib", version.ref = "geckolib" }
-annovg = { module = "org.lwjgl:lwjgl-nanovg", version.ref = "nanovg" }
+nanovg = { module = "org.lwjgl:lwjgl-nanovg", version.ref = "nanovg" }
 
 [plugins]
 fabric-loom = { id = "fabric-loom", version.ref = "loom" }
