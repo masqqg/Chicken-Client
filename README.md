@@ -30,7 +30,7 @@ No Meteor, no addon API, no external client dependency.
 | **Blockbench** | `.geo.json` model and `.animation.json` clips in `assets/chicken-client` |
 
 NanoVG and its natives are shaded into the jar (JiJ), so no extra download is needed.
-GeckoLib must be installed next to the client.
+GeckoLib is optional: when it is installed the karambit curves come from GeckoLib, otherwise the client uses its built-in easing.
 
 ## Build
 
@@ -43,7 +43,7 @@ The jar lands in `build/libs/chicken-client-1.0.0.jar`.
 ## Usage
 
 1. Install Fabric Loader 0.19.5+ for Minecraft 1.21.11.
-2. Drop GeckoLib (Fabric 1.21.11) and the Chicken Client jar into `.minecraft/mods`.
+2. Drop the Chicken Client jar into `.minecraft/mods` (GeckoLib is optional).
 3. Launch, press **Right Shift**, toggle modules.
 
 Config is stored in `config/chicken-client/config.json`.

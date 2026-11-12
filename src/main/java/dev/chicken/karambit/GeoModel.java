@@ -11,7 +11,6 @@ import dev.chicken.render.Color;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import org.joml.Quaternionf;
-import software.bernie.geckolib.animation.object.EasingType;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -25,8 +24,8 @@ import java.util.Map;
  * A Blockbench geometry + animation model, rendered by the client.
  *
  * <p>Geometry and animation come straight out of Blockbench (the usual {@code .geo.json} and
- * {@code .animation.json} exports). Bone animation curves are evaluated through GeckoLib's
- * {@link EasingType} implementations so the model animates the same way it does in game.</p>
+ * {@code .animation.json} exports). Bone animation curves go through {@link Easing}, which uses
+ * GeckoLib's own curves when that mod is installed and built-in ones otherwise.</p>
  */
 public final class GeoModel {
     private final List<Bone> bones = new ArrayList<>();
@@ -118,8 +117,8 @@ public final class GeoModel {
             Clip clip = new Clip(animation.has("animation_length") ? animation.get("animation_length").getAsFloat() : 1.0f);
             clip.loop = !animation.has("loop") || animation.get("loop").getAsBoolean();
             clip.easing = animation.has("easing")
-                ? EasingType.fromString(animation.get("easing").getAsString())
-                : EasingType.EASE_IN_OUT_SINE;
+                ? Easing.fromString(animation.get("easing").getAsString())
+                : Easing.EASE_IN_OUT_SINE;
 
             if (animation.has("bones")) {
                 for (Map.Entry<String, JsonElement> boneEntry : animation.getAsJsonObject("bones").entrySet()) {
@@ -307,15 +306,15 @@ public final class GeoModel {
         final List<Keyframe> rotation = new ArrayList<>();
         final List<Keyframe> position = new ArrayList<>();
 
-        float[] sampleRotation(float time, EasingType easing) {
+        float[] sampleRotation(float time, Easing easing) {
             return sample(rotation, time, easing);
         }
 
-        float[] samplePosition(float time, EasingType easing) {
+        float[] samplePosition(float time, Easing easing) {
             return sample(position, time, easing);
         }
 
-        private static float[] sample(List<Keyframe> frames, float time, EasingType easing) {
+        private static float[] sample(List<Keyframe> frames, float time, Easing easing) {
             if (frames.isEmpty()) return new float[]{0.0f, 0.0f, 0.0f};
             if (frames.size() == 1) return frames.get(0).value;
 
@@ -330,7 +329,7 @@ public final class GeoModel {
 
                 float span = Math.max(0.0001f, to.time - from.time);
                 double raw = (time - from.time) / span;
-                double eased = easing.buildTransformer(1.0).applyAsDouble(raw);
+                double eased = easing.ease((float) raw);
 
                 return new float[]{
                     (float) (from.value[0] + (to.value[0] - from.value[0]) * eased),
@@ -347,7 +346,7 @@ public final class GeoModel {
         final float length;
         final Map<String, Channel> channels = new HashMap<>();
         boolean loop = true;
-        EasingType easing = EasingType.EASE_IN_OUT_SINE;
+        Easing easing = Easing.EASE_IN_OUT_SINE;
 
         Clip(float length) {
             this.length = Math.max(0.1f, length);
