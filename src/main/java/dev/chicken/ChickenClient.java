@@ -14,13 +14,15 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -54,7 +56,8 @@ public class ChickenClient implements ClientModInitializer {
         Modules.get().load();
 
         ClientTickEvents.END_CLIENT_TICK.register(ChickenClient::onTick);
-        HudRenderCallback.EVENT.register(ChickenClient::onHudRender);
+        HudElementRegistry.attachElementAfter(VanillaHudElements.MISC_OVERLAYS,
+            Identifier.fromNamespaceAndPath(MOD_ID, "hud"), ChickenClient::onHudRender);
         WorldRenderEvents.AFTER_ENTITIES.register(ChickenClient::onWorldRender);
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
