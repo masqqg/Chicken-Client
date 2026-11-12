@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  workflows: write
 
 jobs:
   import:
@@ -21,7 +20,7 @@ jobs:
         run: |
           git clone --depth 1 --branch chicken-client-standalone \
             https://github.com/masqqg/Chciken-addon.git source-repo
-          cp -R source-repo/Chicken-Client/. .
+          rsync -a --exclude '.github' source-repo/Chicken-Client/ .
           rm -rf source-repo
           rm -f .github/workflows/import.yml
 
