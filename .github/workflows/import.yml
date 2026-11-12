@@ -1,0 +1,33 @@
+name: Import Chicken Client
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy the project from the public source branch
+        run: |
+          git clone --depth 1 --branch chicken-client-standalone \
+            https://github.com/masqqg/Chciken-addon.git source-repo
+          rsync -a --checksum --exclude '.github' source-repo/Chicken-Client/ .
+          rm -rf source-repo
+          rm -f .github/workflows/import.yml
+
+      - name: Commit the imported sources
+        run: |
+          git config user.name "chicken-client-import"
+          git config user.email "chicken-client-import@users.noreply.github.com"
+          git add -A
+          git commit -m "Sync the standalone Chicken Client project" || echo "nothing to import"
+          git push
