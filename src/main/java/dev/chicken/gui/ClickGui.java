@@ -226,8 +226,7 @@ public class ClickGui extends Screen {
             r.line(cx, searchY + 7.0f, cx, searchY + 19.0f, 1.0f, Theme.ACCENT);
         }
 
-        boolean focus = searchFocused;
-        addHotspot(x + 10.0f, searchY, w - 20.0f, 26.0f, () -> searchFocused = focus || true);
+        addHotspot(x + 10.0f, searchY, w - 20.0f, 26.0f, () -> searchFocused = true);
 
         // Hint
         r.text("RIGHT SHIFT", x + 16.0f, y + h - 12.0f, 7.5f, Renderer2D.Font.Medium, Theme.TEXT_FAINT);
