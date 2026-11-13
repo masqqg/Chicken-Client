@@ -99,9 +99,32 @@ public class Karambit extends Module {
         .defaultValue(true)
         .build());
 
+    private final Setting<Boolean> cosmicSky = sgRender.add(new BoolSetting.Builder()
+        .name("cosmic-sky")
+        .description("Round ripples that spread north, east, south and west when you jump.")
+        .defaultValue(true)
+        .build());
+
+    private final Setting<Double> rippleDistance = sgRender.add(new DoubleSetting.Builder()
+        .name("ripple-distance")
+        .description("How many blocks away from you the four ripples appear.")
+        .defaultValue(5.0)
+        .range(1.0, 12.0)
+        .sliderRange(2.0, 8.0)
+        .build());
+
+    /** How long one jump ripple takes to reach its full size. */
+    private static final long RIPPLE_MILLIS = 1300L;
+
     private GeoModel model;
     private float time;
     private final float[] trail = new float[64];
+
+    private boolean wasOnGround = true;
+    private long rippleStart;
+    private double rippleX;
+    private double rippleY;
+    private double rippleZ;
 
     public Karambit() {
         super(Categories.VISUALS, "karambit", "Red Wings karambit with animated wings in first person.");
@@ -128,11 +151,26 @@ public class Karambit extends Module {
         // Keep the wing trail history in sync with the animation.
         System.arraycopy(trail, 0, trail, 1, trail.length - 1);
         trail[0] = (float) Math.sin(time * 1.6) * 0.06f;
+
+        // A jump starts the cosmic sky ripples, anchored where the jump left the ground.
+        boolean grounded = mc.player.onGround();
+        if (cosmicSky.get() && wasOnGround && !grounded && mc.player.getDeltaMovement().y > 0.0) {
+            rippleStart = System.currentTimeMillis();
+            rippleX = mc.player.getX();
+            rippleY = mc.player.getY();
+            rippleZ = mc.player.getZ();
+        }
+
+        wasOnGround = grounded;
     }
 
     @EventHandler
     private void onRender(Render3DEvent event) {
         if (mc.level == null || mc.player == null) return;
+
+        // Ripples live in the world, so they show in third person as well.
+        if (cosmicSky.get()) renderCosmicSky(event);
+
         if (mc.options.getCameraType() != net.minecraft.client.CameraType.FIRST_PERSON) return;
         if (model == null || !model.hasClip(clipName())) return;
 
@@ -157,6 +195,40 @@ public class Karambit extends Module {
 
     private String clipName() {
         return animation.get() == Animation.Inspect ? "inspect" : "idle";
+    }
+
+    /**
+     * The cosmic sky: three rings race out from four points five blocks to the north, east, south
+     * and west of the jump, expanding, thinning and fading as they go.
+     */
+    private void renderCosmicSky(Render3DEvent event) {
+        if (rippleStart == 0L) return;
+
+        float progress = (System.currentTimeMillis() - rippleStart) / (float) RIPPLE_MILLIS;
+        if (progress < 0.0f || progress >= 1.0f) return;
+
+        double distance = rippleDistance.get();
+        Color base = wingColor.get();
+        double groundY = rippleY + 0.05;
+
+        for (int wave = 0; wave < 3; wave++) {
+            float t = progress - wave * 0.18f;
+            if (t <= 0.0f || t >= 1.0f) continue;
+
+            float radius = 0.35f + t * 2.1f;
+            float thickness = 0.30f * (1.0f - t * 0.5f);
+            Color color = new Color(base.r, base.g, base.b, (int) ((1.0f - t) * 0.7f * 255.0f));
+
+            event.renderer.ring(rippleX + distance, groundY, rippleZ, radius, thickness, color);
+            event.renderer.ring(rippleX - distance, groundY, rippleZ, radius, thickness, color);
+            event.renderer.ring(rippleX, groundY, rippleZ + distance, radius, thickness, color);
+            event.renderer.ring(rippleX, groundY, rippleZ - distance, radius, thickness, color);
+        }
+    }
+
+    @Override
+    protected void onDeactivate() {
+        rippleStart = 0L;
     }
 
     private void renderGlow(Render3DEvent event, PoseStack matrices) {

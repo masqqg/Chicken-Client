@@ -771,6 +771,12 @@ public final class Renderer2D {
         float scale = Math.max(0.35f, size / BASE_TEXT);
         float width = mc.font.width(styled) * scale;
 
+        if (width <= 0.0f) {
+            // The bundled font did not resolve on this install; never draw invisible text.
+            styled = Component.literal(value);
+            width = mc.font.width(styled) * scale;
+        }
+
         float drawX = x;
         if ((align & NanoVG.NVG_ALIGN_CENTER) != 0) drawX -= width * 0.5f;
         else if ((align & NanoVG.NVG_ALIGN_RIGHT) != 0) drawX -= width;
@@ -819,8 +825,13 @@ public final class Renderer2D {
         if (!inFrame || text == null || text.isEmpty()) return 0.0f;
 
         if (backend == Backend.Vanilla) {
+            Minecraft mc = Minecraft.getInstance();
             Component styled = Component.literal(text).withStyle(style(font));
-            return Minecraft.getInstance().font.width(styled) * Math.max(0.35f, size / BASE_TEXT);
+            float width = mc.font.width(styled);
+
+            if (width <= 0.0f) width = mc.font.width(Component.literal(text));
+
+            return width * Math.max(0.35f, size / BASE_TEXT);
         }
 
         int handle = fontHandles[font.ordinal()];

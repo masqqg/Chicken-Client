@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.7
+
+### Fixed
+
+- No text anywhere in the HUD or the click GUI: the TTF providers pointed at
+  `chicken-client:font/<file>.ttf`, but Minecraft resolves that id under `assets/<namespace>/font/`
+  already, so the game looked for `font/font/<file>.ttf` and rendered nothing but placeholders.
+  The providers now point at `chicken-client:<file>.ttf`, and the fallback draws with the vanilla
+  font instead of nothing if a bundled font ever fails to resolve.
+
+### Added
+
+- Karambit **cosmic sky**: jumping sends three expanding rings out to the north, east, south and
+  west, five blocks away, fading as they grow. New settings `cosmic-sky` and `ripple-distance`.
+
 ## 1.0.6
 
 ### Fixed

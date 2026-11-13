@@ -2,7 +2,7 @@
   "providers": [
     {
       "type": "ttf",
-      "file": "chicken-client:font/inter_bold.ttf",
+      "file": "chicken-client:inter_bold.ttf",
       "size": 10.0,
       "oversample": 2.0,
       "shift": [0, 0],

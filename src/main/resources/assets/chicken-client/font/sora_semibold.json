@@ -2,7 +2,7 @@
   "providers": [
     {
       "type": "ttf",
-      "file": "chicken-client:font/sora_semibold.ttf",
+      "file": "chicken-client:sora_semibold.ttf",
       "size": 10.0,
       "oversample": 2.0,
       "shift": [0, 0],

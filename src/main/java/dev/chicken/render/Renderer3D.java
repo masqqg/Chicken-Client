@@ -47,6 +47,46 @@ public final class Renderer3D {
         emitLine(buffer, pose, x1, y1, z1, x2, y2, z2, color);
     }
 
+    /**
+     * A flat ring on the world, used by the karambit's jump ripples. Drawn as a band of quads so
+     * the colour and its alpha are actually visible on the ground.
+     */
+    public void ring(double cx, double cy, double cz, float radius, float thickness, Color color) {
+        if (radius <= 0.0f || thickness <= 0.0f) return;
+
+        VertexConsumer buffer = sides();
+        PoseStack.Pose pose = matrices.last();
+        int segments = 56;
+        float inner = Math.max(0.0f, radius - thickness * 0.5f);
+        float outer = radius + thickness * 0.5f;
+
+        for (int i = 0; i < segments; i++) {
+            double a0 = (Math.PI * 2.0) * i / segments;
+            double a1 = (Math.PI * 2.0) * (i + 1) / segments;
+
+            double c0 = Math.cos(a0);
+            double s0 = Math.sin(a0);
+            double c1 = Math.cos(a1);
+            double s1 = Math.sin(a1);
+
+            flatQuad(buffer, pose,
+                cx + c0 * inner, cy, cz + s0 * inner,
+                cx + c0 * outer, cy, cz + s0 * outer,
+                cx + c1 * outer, cy, cz + s1 * outer,
+                cx + c1 * inner, cy, cz + s1 * inner,
+                color);
+        }
+    }
+
+    private void flatQuad(VertexConsumer buffer, PoseStack.Pose pose,
+                          double x1, double y1, double z1, double x2, double y2, double z2,
+                          double x3, double y3, double z3, double x4, double y4, double z4, Color c) {
+        buffer.addVertex(pose, (float) (x1 - camera.x), (float) (y1 - camera.y), (float) (z1 - camera.z)).setColor(c.r, c.g, c.b, c.a);
+        buffer.addVertex(pose, (float) (x2 - camera.x), (float) (y2 - camera.y), (float) (z2 - camera.z)).setColor(c.r, c.g, c.b, c.a);
+        buffer.addVertex(pose, (float) (x3 - camera.x), (float) (y3 - camera.y), (float) (z3 - camera.z)).setColor(c.r, c.g, c.b, c.a);
+        buffer.addVertex(pose, (float) (x4 - camera.x), (float) (y4 - camera.y), (float) (z4 - camera.z)).setColor(c.r, c.g, c.b, c.a);
+    }
+
     private VertexConsumer lines() {
         if (lineBuffer == null) lineBuffer = consumers.getBuffer(RenderTypes.lines());
         return lineBuffer;
