@@ -81,6 +81,9 @@ public final class Renderer2D {
     private float scaleY = 1.0f;
     private float globalAlpha = 1.0f;
     private boolean scissor;
+    /** enableScissor() calls of this frame that are still on GuiGraphics' own scissor stack. */
+    private int scissorDepth;
+    private boolean scissorWarned;
     private int scissorX1;
     private int scissorY1;
     private int scissorX2;
@@ -141,8 +144,9 @@ public final class Renderer2D {
         inFrame = false;
 
         if (backend == Backend.Vanilla) {
-            // Never leave a scissor behind: it would clip the rest of the game's interface.
-            if (graphics != null) graphics.disableScissor();
+            // Pop only the clips this frame pushed. Popping an entry we never pushed throws
+            // GuiGraphics' "Scissor stack underflow", and leaving ours behind clips the game UI.
+            while (scissorDepth > 0) popScissor();
             graphics = null;
             resetTransform();
             return;
@@ -461,6 +465,7 @@ public final class Renderer2D {
         int scissorY1;
         int scissorX2;
         int scissorY2;
+        int scissorDepth;
     }
 
     private State capture() {
@@ -475,17 +480,32 @@ public final class Renderer2D {
         state.scissorY1 = scissorY1;
         state.scissorX2 = scissorX2;
         state.scissorY2 = scissorY2;
+        state.scissorDepth = scissorDepth;
         return state;
     }
 
-    private void applyScissor() {
+    private void pushScissor(int x1, int y1, int x2, int y2) {
         if (graphics == null) return;
 
-        if (scissor) {
-            graphics.enableScissor(scissorX1, scissorY1, scissorX2, scissorY2);
-        } else {
+        graphics.enableScissor(x1, y1, x2, y2);
+        scissorDepth++;
+    }
+
+    private void popScissor() {
+        if (graphics == null || scissorDepth <= 0) return;
+
+        try {
             graphics.disableScissor();
+        } catch (IllegalStateException e) {
+            // Something else emptied the stack; keep our bookkeeping in step and carry on
+            // rather than taking the game down over the interface.
+            if (!scissorWarned) {
+                scissorWarned = true;
+                ChickenClient.LOG.warn("Scissor stack was already empty; continuing without it", e);
+            }
         }
+
+        scissorDepth--;
     }
 
     private void resetTransform() {
@@ -496,6 +516,7 @@ public final class Renderer2D {
         scaleY = 1.0f;
         globalAlpha = 1.0f;
         scissor = false;
+        scissorDepth = 0;
     }
 
     public void push() {
@@ -516,7 +537,6 @@ public final class Renderer2D {
             State state = states.poll();
             if (state == null) return;
 
-            boolean hadScissor = scissor;
             shiftX = state.shiftX;
             shiftY = state.shiftY;
             scaleX = state.scaleX;
@@ -528,7 +548,12 @@ public final class Renderer2D {
             scissorX2 = state.scissorX2;
             scissorY2 = state.scissorY2;
 
-            if (hadScissor || scissor) applyScissor();
+            // Clips opened inside this push are closed here, and a clip that was popped inside
+            // it is put back, so the GuiGraphics stack always matches this state again.
+            while (scissorDepth > state.scissorDepth) popScissor();
+            if (scissorDepth < state.scissorDepth && scissor) {
+                pushScissor(scissorX1, scissorY1, scissorX2, scissorY2);
+            }
             return;
         }
 
@@ -588,7 +613,7 @@ public final class Renderer2D {
             scissorY1 = (int) Math.floor(ty(y));
             scissorX2 = (int) Math.ceil(tx(x + w));
             scissorY2 = (int) Math.ceil(ty(y + h));
-            applyScissor();
+            pushScissor(scissorX1, scissorY1, scissorX2, scissorY2);
             return;
         }
 
@@ -600,7 +625,7 @@ public final class Renderer2D {
 
         if (backend == Backend.Vanilla) {
             scissor = false;
-            applyScissor();
+            popScissor();
             return;
         }
 

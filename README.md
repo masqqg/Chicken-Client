@@ -38,7 +38,7 @@ GeckoLib is optional: when it is installed the karambit curves come from GeckoLi
 ./gradlew build
 ```
 
-The jar lands in `build/libs/chicken-client-1.0.4.jar`.
+The jar lands in `build/libs/chicken-client-1.0.5.jar`.
 
 ## Usage
 

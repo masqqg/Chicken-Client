@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.5
+
+### Fixed
+
+- `IllegalStateException: Scissor stack underflow` from `Renderer2D.end()` on the vanilla fallback:
+  the frame end called `GuiGraphics.disableScissor()` whether or not a clip was open. Clip
+  pushes and pops are now counted, `push()`/`pop()` keep the stack in step with the renderer
+  state, and the frame end unwinds only the clips it opened. An already empty stack is logged
+  once and skipped instead of throwing.
+
 ## 1.0.4
 
 ### Fixed
