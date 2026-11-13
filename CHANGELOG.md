@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.6
+
+### Fixed
+
+- Opening the click GUI crashed with `IllegalStateException: Can only blur once per frame`: the
+  screen already blurs the world when it opens and the GUI blurred it a second time.
+
+### Changed
+
+- The bundled Inter and Sora fonts are registered as Minecraft font resources (`assets/chicken-client/font`),
+  so the fallback renderer draws real typography instead of the vanilla bitmap font.
+- The fallback draws rounded panels, gradients, borders and circles by stacking fills, so the HUD
+  and the click GUI keep their glass panels and orange accent on phones.
+
 ## 1.0.5
 
 ### Fixed
