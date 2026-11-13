@@ -95,16 +95,22 @@ public class ChickenClient implements ClientModInitializer {
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();
 
-        renderer.begin(width, height);
+        renderer.begin(graphics, width, height);
         if (!renderer.isReady()) return;
 
-        Render2DEvent event = new Render2DEvent(graphics, renderer, width, height,
-            delta.getGameTimeDeltaPartialTick(false));
+        try {
+            Render2DEvent event = new Render2DEvent(graphics, renderer, width, height,
+                delta.getGameTimeDeltaPartialTick(false));
 
-        Modules.get().post(event);
-        Hud.render(event);
-
-        renderer.end();
+            Modules.get().post(event);
+            Hud.render(event);
+        } catch (Throwable t) {
+            // One broken frame must never take the game down.
+            LOG.error("HUD render failed", t);
+        } finally {
+            // Always close the frame, otherwise the next one starts with NanoVG still open.
+            renderer.end();
+        }
     }
 
     private static void onWorldRender(WorldRenderContext context) {

@@ -105,7 +105,7 @@ public class ClickGui extends Screen {
         // Backdrop: vanilla's real world blur, then a themed gradient and a vignette.
         renderBlurredBackground(graphics);
 
-        r.begin(width, height);
+        r.begin(graphics, width, height);
         hotspots.clear();
 
         drawBackdrop(r, eased);
@@ -122,14 +122,19 @@ public class ClickGui extends Screen {
         float scale = 0.94f + 0.06f * eased;
         r.alpha(eased);
         r.push();
-        r.translate(px + panelWidth * 0.5f, py + panelHeight * 0.5f);
-        r.scale(scale, scale);
-        r.translate(-(px + panelWidth * 0.5f), -(py + panelHeight * 0.5f));
 
-        drawPanel(r, px, py, panelWidth, panelHeight, mouseX, mouseY, delta);
+        try {
+            r.translate(px + panelWidth * 0.5f, py + panelHeight * 0.5f);
+            r.scale(scale, scale);
+            r.translate(-(px + panelWidth * 0.5f), -(py + panelHeight * 0.5f));
 
-        r.pop();
-        r.end();
+            drawPanel(r, px, py, panelWidth, panelHeight, mouseX, mouseY, delta);
+        } catch (Throwable t) {
+            ChickenClient.LOG.error("Click GUI render failed", t);
+        } finally {
+            r.pop();
+            r.end();
+        }
     }
 
     private float frameDelta() {

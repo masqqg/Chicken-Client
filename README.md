@@ -38,7 +38,7 @@ GeckoLib is optional: when it is installed the karambit curves come from GeckoLi
 ./gradlew build
 ```
 
-The jar lands in `build/libs/chicken-client-1.0.0.jar`.
+The jar lands in `build/libs/chicken-client-1.0.4.jar`.
 
 ## Usage
 
@@ -47,6 +47,18 @@ The jar lands in `build/libs/chicken-client-1.0.0.jar`.
 3. Launch, press **Right Shift**, toggle modules.
 
 Config is stored in `config/chicken-client/config.json`.
+
+### Renderer
+
+The interface is drawn with NanoVG on desktop drivers. On OpenGL ES contexts and GL-to-GLES
+translators (ANGLE, MobileGlues, GL4ES, LTW, Zink — the stacks Android launchers use) NanoVG
+crashes inside its own native code, so there the same drawing calls are replayed through the
+vanilla `GuiGraphics` renderer instead. Files in `config/chicken-client` control it:
+
+| File | Effect |
+| --- | --- |
+| `disable-hud` | Draw no HUD and no GUI at all |
+| `force-nanovg` | Use NanoVG even on a translated stack |
 
 ## Layout
 
