@@ -3,6 +3,11 @@ package dev.chicken.render;
 import dev.chicken.ChickenClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
+import org.joml.Matrix3x2fStack;
 import org.lwjgl.nanovg.NVGColor;
 import org.lwjgl.nanovg.NVGPaint;
 import org.lwjgl.nanovg.NanoVG;
@@ -26,21 +31,38 @@ import java.util.Deque;
  * <p>NanoVG's desktop GL3 backend talks to the driver through its own GL entry points, which the
  * GL-to-GLES translators used by Android launchers (ANGLE, MobileGlues, GL4ES, ...) do not
  * survive - there it took the whole game down with a native SIGSEGV while the context was being
- * created. On those stacks the same drawing calls are replayed through {@link GuiGraphics}
- * instead, so the interface still works without touching NanoVG at all.</p>
+ * created. On those stacks the same drawing calls are replayed through {@link GuiGraphics}: the
+ * bundled Inter/Sora fonts are registered as font resources, rounded panels are approximated
+ * with a row of fills and gradients are interpolated between them, so the interface keeps the
+ * modern look without touching NanoVG at all.</p>
  */
 public final class Renderer2D {
     public enum Font {
-        Regular("Inter-Regular.ttf"),
-        Medium("Inter-Medium.ttf"),
-        SemiBold("Inter-SemiBold.ttf"),
-        Bold("Inter-Bold.ttf"),
-        Display("Sora-SemiBold.ttf");
+        Regular("inter_regular"),
+        Medium("inter_medium"),
+        SemiBold("inter_semibold"),
+        Bold("inter_bold"),
+        Display("sora_semibold");
 
-        private final String file;
+        private final String id;
 
-        Font(String file) {
-            this.file = file;
+        Font(String id) {
+            this.id = id;
+        }
+
+        /** NanoVG face name and base of the resource path. */
+        public String id() {
+            return id;
+        }
+
+        /** Path inside the mod jar, used by the NanoVG backend. */
+        public String file() {
+            return "/assets/" + ChickenClient.MOD_ID + "/font/" + id + ".ttf";
+        }
+
+        /** Font resource registered in {@code assets/chicken-client/font}, used by the fallback. */
+        public Identifier resource() {
+            return Identifier.fromNamespaceAndPath(ChickenClient.MOD_ID, id);
         }
     }
 
@@ -53,6 +75,9 @@ public final class Renderer2D {
         /** Switched off from the config folder. */
         Disabled
     }
+
+    /** Pixel size the bundled fonts are registered at; drawing scales around this. */
+    private static final float BASE_TEXT = 10.0f;
 
     /** GL renderer/vendor substrings that mark a translated (non desktop) stack. */
     private static final String[] TRANSLATORS = {
@@ -249,7 +274,7 @@ public final class Renderer2D {
     }
 
     private int loadFont(Font font) {
-        String path = "/assets/" + ChickenClient.MOD_ID + "/fonts/" + font.file;
+        String path = font.file();
 
         try (InputStream in = Renderer2D.class.getResourceAsStream(path)) {
             if (in == null) {
@@ -262,7 +287,7 @@ public final class Renderer2D {
             buffer.put(bytes).flip();
 
             // freeData = true, NanoVG owns the buffer from here on.
-            return NanoVG.nvgCreateFontMem(ctx, font.name().toLowerCase(), buffer, true);
+            return NanoVG.nvgCreateFontMem(ctx, font.id(), buffer, true);
         } catch (Exception e) {
             ChickenClient.LOG.error("Could not load font {}", path, e);
             return -1;
@@ -277,6 +302,11 @@ public final class Renderer2D {
 
     private int argb(Color c) {
         return c.toArgb((int) (c.a * globalAlpha));
+    }
+
+    /** Text style that draws with one of the bundled fonts. */
+    private static Style style(Font font) {
+        return Style.EMPTY.withFont(new FontDescription.Resource(font.resource()));
     }
 
     /** Horizontal position of a drawing coordinate, through the fallback transform stack. */
@@ -301,13 +331,72 @@ public final class Renderer2D {
         graphics.fill(ax, ay, bx, by, argb(c));
     }
 
+    /**
+     * A rounded rectangle filled with a row of quads. When {@code bottom} is given the colour is
+     * interpolated down the rectangle, which gives the fallback its gradients.
+     */
+    private void fillRounded(float x1, float y1, float x2, float y2, float radius, Color top, Color bottom) {
+        if (graphics == null) return;
+
+        float left = Math.min(x1, x2);
+        float right = Math.max(x1, x2);
+        float topY = Math.min(y1, y2);
+        float bottomY = Math.max(y1, y2);
+        float width = right - left;
+        float height = bottomY - topY;
+
+        if (width <= 0.0f || height <= 0.0f) return;
+
+        float r = Math.max(0.0f, Math.min(radius, Math.min(width, height) * 0.5f));
+        Color end = bottom == null ? top : bottom;
+
+        // Rows of ~2px keep the edges smooth without flooding the gui batch.
+        int rows = Math.max(1, Math.min(96, (int) Math.ceil(height / 2.0f)));
+        float rowHeight = height / rows;
+
+        for (int i = 0; i < rows; i++) {
+            float rowTop = topY + i * rowHeight;
+            float rowBottom = rowTop + rowHeight;
+            float inset = roundedInset(r, topY, bottomY, (rowTop + rowBottom) * 0.5f);
+            Color color = bottom == null ? top : Color.lerp(top, end, (i + 0.5f) / rows);
+            fill(left + inset, rowTop, right - inset, rowBottom, color);
+        }
+    }
+
+    /** Horizontal inset of a rounded rectangle at the given y. */
+    private static float roundedInset(float radius, float topY, float bottomY, float y) {
+        if (radius <= 0.5f) return 0.0f;
+
+        float distance = Math.min(y - topY, bottomY - y);
+        if (distance >= radius) return 0.0f;
+
+        float dy = radius - distance;
+        return radius - (float) Math.sqrt(Math.max(0.0f, radius * radius - dy * dy));
+    }
+
+    /** A filled circle, drawn as a stack of horizontal slices. */
+    private void fillCircle(float cx, float cy, float radius, Color c) {
+        if (graphics == null || radius <= 0.0f) return;
+
+        int rows = Math.max(3, (int) Math.ceil(radius * 2.0f));
+        float top = cy - radius;
+
+        for (int i = 0; i < rows; i++) {
+            float y1 = top + 2.0f * radius * i / rows;
+            float y2 = top + 2.0f * radius * (i + 1) / rows;
+            float distance = Math.abs((y1 + y2) * 0.5f - cy);
+            float half = (float) Math.sqrt(Math.max(0.0f, radius * radius - distance * distance));
+            fill(cx - half, y1, cx + half, y2, c);
+        }
+    }
+
     // ------------------------------------------------------------------ shapes
 
     public void rect(float x, float y, float w, float h, Color c) {
         if (!inFrame || w <= 0 || h <= 0) return;
 
         if (backend == Backend.Vanilla) {
-            fill(x, y, x + w, y + h, c);
+            fillRounded(x, y, x + w, y + h, 0.0f, c, null);
             return;
         }
 
@@ -321,7 +410,7 @@ public final class Renderer2D {
         if (!inFrame || w <= 0 || h <= 0) return;
 
         if (backend == Backend.Vanilla) {
-            fill(x, y, x + w, y + h, c);
+            fillRounded(x, y, x + w, y + h, radius, c, null);
             return;
         }
 
@@ -336,7 +425,7 @@ public final class Renderer2D {
         if (!inFrame || w <= 0 || h <= 0) return;
 
         if (backend == Backend.Vanilla) {
-            fill(x, y, x + w, y + h, Color.lerp(top, bottom, 0.5f));
+            fillRounded(x, y, x + w, y + h, radius, top, bottom);
             return;
         }
 
@@ -352,7 +441,7 @@ public final class Renderer2D {
         if (!inFrame || w <= 0 || h <= 0) return;
 
         if (backend == Backend.Vanilla) {
-            fill(x, y, x + w, y + h, Color.lerp(left, right, 0.5f));
+            fillRounded(x, y, x + w, y + h, radius, Color.lerp(left, right, 0.5f), null);
             return;
         }
 
@@ -367,10 +456,27 @@ public final class Renderer2D {
         if (!inFrame || w <= 0 || h <= 0) return;
 
         if (backend == Backend.Vanilla) {
-            fill(x, y, x + w, y + width, c);
-            fill(x, y + h - width, x + w, y + h, c);
-            fill(x, y, x + width, y + h, c);
-            fill(x + w - width, y, x + w, y + h, c);
+            float t = Math.max(1.0f, width);
+            float r = Math.max(0.0f, Math.min(radius, Math.min(w, h) * 0.5f));
+
+            // Four bands follow the rounded corners by tracking the same inset.
+            int rows = Math.max(2, Math.min(24, (int) Math.ceil(r)));
+            float rowHeight = Math.max(1.0f, r / rows);
+
+            fill(x + r, y, x + w - r, y + t, c);
+            fill(x + r, y + h - t, x + w - r, y + h, c);
+            fill(x, y + r, x + t, y + h - r, c);
+            fill(x + w - t, y + r, x + w, y + h - r, c);
+
+            for (int i = 0; i < rows; i++) {
+                float cell = i * rowHeight;
+                float inset = roundedInset(r, y, y + h, y + r - cell - rowHeight * 0.5f);
+                fill(x + inset, y + r - cell - rowHeight, x + inset + t, y + r - cell, c);
+                fill(x + w - inset - t, y + r - cell - rowHeight, x + w - inset, y + r - cell, c);
+                fill(x + inset, y + h - r + cell, x + inset + t, y + h - r + cell + rowHeight, c);
+                fill(x + w - inset - t, y + h - r + cell, x + w - inset, y + h - r + cell + rowHeight, c);
+            }
+
             return;
         }
 
@@ -385,7 +491,7 @@ public final class Renderer2D {
         if (!inFrame || r <= 0) return;
 
         if (backend == Backend.Vanilla) {
-            fill(cx - r, cy - r, cx + r, cy + r, c);
+            fillCircle(cx, cy, r, c);
             return;
         }
 
@@ -638,18 +744,7 @@ public final class Renderer2D {
         if (!inFrame || text == null || text.isEmpty()) return;
 
         if (backend == Backend.Vanilla) {
-            Minecraft mc = Minecraft.getInstance();
-            int width = mc.font.width(text);
-
-            float drawX = x;
-            if ((align & NanoVG.NVG_ALIGN_CENTER) != 0) drawX -= width * 0.5f;
-            else if ((align & NanoVG.NVG_ALIGN_RIGHT) != 0) drawX -= width;
-
-            float drawY = y - 4.0f;
-            if ((align & NanoVG.NVG_ALIGN_TOP) != 0) drawY = y;
-            else if ((align & NanoVG.NVG_ALIGN_BOTTOM) != 0) drawY = y - 8.0f;
-
-            graphics.drawString(mc.font, text, (int) tx(drawX), (int) ty(drawY), argb(c), false);
+            drawText(text, x, y, size, font, c, align);
             return;
         }
 
@@ -661,6 +756,35 @@ public final class Renderer2D {
         NanoVG.nvgTextAlign(ctx, align);
         NanoVG.nvgFillColor(ctx, nvgColor(c));
         NanoVG.nvgText(ctx, x, y, text);
+    }
+
+    /**
+     * Draws text with the bundled font through Minecraft's own font renderer, scaled to the
+     * requested size. This is what keeps the fallback from looking like the vanilla font.
+     */
+    private void drawText(String value, float x, float y, float size, Font font, Color c, int align) {
+        if (graphics == null) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        Component styled = Component.literal(value).withStyle(style(font));
+
+        float scale = Math.max(0.35f, size / BASE_TEXT);
+        float width = mc.font.width(styled) * scale;
+
+        float drawX = x;
+        if ((align & NanoVG.NVG_ALIGN_CENTER) != 0) drawX -= width * 0.5f;
+        else if ((align & NanoVG.NVG_ALIGN_RIGHT) != 0) drawX -= width;
+
+        float drawY = y - BASE_TEXT * scale * 0.5f - 1.0f;
+        if ((align & NanoVG.NVG_ALIGN_TOP) != 0) drawY = y;
+        else if ((align & NanoVG.NVG_ALIGN_BOTTOM) != 0) drawY = y - BASE_TEXT * scale;
+
+        Matrix3x2fStack pose = graphics.pose();
+        pose.pushMatrix();
+        pose.translate(tx(drawX), ty(drawY));
+        pose.scale(scale, scale);
+        graphics.drawString(mc.font, styled, 0, 0, argb(c), false);
+        pose.popMatrix();
     }
 
     public void text(String text, float x, float y, float size, Font font, Color c) {
@@ -695,9 +819,8 @@ public final class Renderer2D {
         if (!inFrame || text == null || text.isEmpty()) return 0.0f;
 
         if (backend == Backend.Vanilla) {
-            // Keep layout proportional to the requested size even though the fallback always
-            // draws the vanilla bitmap font.
-            return Minecraft.getInstance().font.width(text) * Math.max(0.5f, size / 9.0f);
+            Component styled = Component.literal(text).withStyle(style(font));
+            return Minecraft.getInstance().font.width(styled) * Math.max(0.35f, size / BASE_TEXT);
         }
 
         int handle = fontHandles[font.ordinal()];

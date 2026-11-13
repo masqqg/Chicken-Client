@@ -102,9 +102,8 @@ public class ClickGui extends Screen {
         float appear = Anim.clamp01(open.f());
         float eased = Anim.easeOutCubic(appear);
 
-        // Backdrop: vanilla's real world blur, then a themed gradient and a vignette.
-        renderBlurredBackground(graphics);
-
+        // The screen already gets vanilla's world blur when it opens; blurring here as well
+        // throws "Can only blur once per frame".
         r.begin(graphics, width, height);
         hotspots.clear();
 
